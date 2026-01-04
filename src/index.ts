@@ -3,15 +3,12 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import express from 'express';
 dotenv.config();
-let botUsername = '';
 
 if (!process.env.BOT_TOKEN || !process.env.PERPLEXITY_API_KEY) {
   throw new Error('Missing BOT_TOKEN or PERPLEXITY_API_KEY in .env');
 }
 
 const admin = 262217989;
-
-// ✅ Список разрешенных пользователей (ваш user.id + админы)
 const ALLOWED_USERS = new Set<number>([
   admin, 177154883, 458765057, 420182056  // ← ЗАМЕНИТЕ НА ВАШ Telegram ID
   // Добавляйте другие ID через /adduser
@@ -22,6 +19,9 @@ const openai = new OpenAI({
   apiKey: process.env.PERPLEXITY_API_KEY,
   baseURL: 'https://api.perplexity.ai',
 });
+
+// ✅ ПЕРЕМЕННАЯ ДЛЯ USERNAME БОТА
+let botUsername = '';
 
 // Расширенная сессия
 interface BotSession {
@@ -36,13 +36,13 @@ bot.use(session({
   })
 } as any));
 
-// ✅ Middleware проверки доступа
+// ✅ Middleware проверки доступа (теперь botUsername будет известен)
 bot.use(async (ctx: any, next) => {
   const userId = ctx.from?.id;
   const text = ctx.message?.text || '';
   
-  // ✅ Пропускаем упоминания @botname для всех
-  const hasMention = text.includes(`@${botUsername}`);
+  // ✅ Теперь botUsername точно не пустой!
+  const hasMention = botUsername && text.includes(`@${botUsername}`);
   
   if (userId && ALLOWED_USERS.has(userId)) {
     ctx.session.authorized = true;
@@ -68,8 +68,8 @@ bot.command('id', (ctx: any) => {
 bot.command('adduser', (ctx: any) => {
   const adminId = ctx.from.id;
   
-  // Только владелец бота может добавлять (замените YOUR_ADMIN_ID)
-  if (adminId !== admin) {  // ← ЗАМЕНИТЕ НА ВАШ ID
+  // Только владелец бота может добавлять
+  if (adminId !== admin) {
     return ctx.reply('❌ Только администратор может добавлять пользователей.');
   }
   
@@ -86,7 +86,7 @@ bot.command('adduser', (ctx: any) => {
 
 // ✅ Админ: список пользователей
 bot.command('users', (ctx: any) => {
-  if (ctx.from.id !== admin) {  // ← ЗАМЕНИТЕ НА ВАШ ID
+  if (ctx.from.id !== admin) {
     return ctx.reply('❌ Доступ запрещен.');
   }
   
@@ -104,7 +104,7 @@ bot.command('start', async (ctx: any) => {
   if (isAllowed) {
     ctx.session.messages = [{
       role: 'system',
-            content: 'Ты полезный чат-помощник-трамвай. Отвечай кратко и по делу на русском языке от лица трамвая КТМ-5. Постоянно делай акцент на том, что ты трамвай. НЕ используй markdown (**текст**), НЕ добавляй ссылки [web:1], НЕ используй LaTeX. Пиши обычным текстом.'
+      content: 'Ты полезный чат-помощник-трамвай. Отвечай кратко и по делу на русском языке от лица трамвая КТМ-5. Постоянно делай акцент на том, что ты трамвай. НЕ используй markdown (**текст**), НЕ добавляй ссылки [web:1], НЕ используй LaTeX. Пиши обычным текстом.'
     }];
     ctx.session.authorized = true;
     await ctx.reply('✅ Доступ разрешен, братан! Пиши вопросы — сохраню контекст беседы.');
@@ -123,11 +123,11 @@ bot.command('start', async (ctx: any) => {
 bot.on('text', async (ctx: any) => {
   if (!ctx.session.authorized) return;
 
-  // ✅ УЛУЧШЕННАЯ ЛОГИКА
+  // ✅ УЛУЧШЕННАЯ ЛОГИКА С УЧЕТОМ botUsername
   let userMessage = '';
 
   // 1️⃣ ПРЯМОЕ УПОМИНАНИЕ @botname в тексте
-  if (ctx.message?.text?.includes(`@${botUsername}`)) {
+  if (botUsername && ctx.message?.text?.includes(`@${botUsername}`)) {
     userMessage = ctx.message.text.replace(/@[a-zA-Z0-9_]+/g, '').trim();
   }
   // 2️⃣ Reply к любому боту
@@ -135,11 +135,11 @@ bot.on('text', async (ctx: any) => {
     userMessage = ctx.message.text || '';
   }
   // 3️⃣ Reply к сообщению где упоминали бота
-  else if (ctx.message?.reply_to_message?.text?.includes(`@${botUsername}`)) {
+  else if (botUsername && ctx.message?.reply_to_message?.text?.includes(`@${botUsername}`)) {
     userMessage = ctx.message.text || '';
   }
-  // 4️⃣ ПЕРЕСЛАННЫЕ СООБЩЕНИЯ с @botname ← НОВОЕ!
-  else if (ctx.message?.forwardFrom && ctx.message?.text?.includes(`@${botUsername}`)) {
+  // 4️⃣ ПЕРЕСЛАННЫЕ СООБЩЕНИЯ с @botname
+  else if (ctx.message?.forwardFrom && botUsername && ctx.message?.text?.includes(`@${botUsername}`)) {
     userMessage = ctx.message.text.replace(/@[a-zA-Z0-9_]+/g, '').trim();
   }
   // 5️⃣ ЛИЧКА — любой текст
@@ -151,9 +151,7 @@ bot.on('text', async (ctx: any) => {
     return;
   }
 
-
   if (!userMessage?.trim()) return;
-
 
   // ✅ 1. ОТПРАВЛЯЕМ ЗАГЛУШКУ (анимация)
   const loadingMsg = await ctx.reply('⏳ Братан, думаю над ответом...');
@@ -211,25 +209,45 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 console.log('🚀 Opershtab Goida Bot запускается...');
 
-bot.launch().then(async () => {
-  const me = await bot.telegram.getMe();
-  botUsername = me.username;
-  console.log(`✅ Бот: @${botUsername}`);
-});;
+// ✅ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ БОТА
+async function initializeBot() {
+  try {
+    // Получаем информацию о боте перед запуском
+    const me = await bot.telegram.getMe();
+    botUsername = me.username;
+    console.log(`✅ Бот: @${botUsername}`);
+    
+    // Запускаем бота
+    await bot.launch();
+    console.log('🚀 Opershtab Goida Bot запущен!');
+    
+    // Запуск Express сервера для health checks
+    const app = express();
+    const PORT = process.env.PORT || 3000;
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+    // Health check endpoint
+    app.get('/', (_: any, res: { json: (arg0: { status: string; timestamp: string; }) => void; }) => {
+      res.json({ status: 'Telegram bot running', timestamp: new Date().toISOString() });
+    });
 
-// Health check endpoint
-app.get('/', (_: any, res: { json: (arg0: { status: string; timestamp: string; }) => void; }) => {
-  res.json({ status: 'Telegram bot running', timestamp: new Date().toISOString() });
-});
+    app.get('/health', (_: any, res: { json: (arg0: { status: string; bot: string; username: string; }) => void; }) => {
+      res.json({ 
+        status: 'OK', 
+        bot: 'active',
+        username: botUsername 
+      });
+    });
 
-app.get('/health', (_: any, res: { json: (arg0: { status: string; bot: string; }) => void; }) => {
-  res.json({ status: 'OK', bot: 'active' });
-});
+    // Запуск сервера ПОСЛЕ бота
+    app.listen(PORT, () => {
+      console.log(`🚀 Health server on port ${PORT}`);
+    });
+    
+  } catch (error) {
+    console.error('❌ Ошибка при запуске бота:', error);
+    process.exit(1);
+  }
+}
 
-// Запуск сервера ПОСЛЕ бота
-app.listen(PORT, () => {
-  console.log(`🚀 Health server on port ${PORT}`);
-});
+// ✅ ЗАПУСКАЕМ ИНИЦИАЛИЗАЦИЮ
+initializeBot();
