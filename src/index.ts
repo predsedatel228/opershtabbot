@@ -140,11 +140,14 @@ bot.on('text', async (ctx: any) => {
     return;
   }
 
-  if (!userMessage) return;
+  if (!userMessage?.trim()) return;
 
-  // Добавляем в контекст
-  ctx.session.messages.push({ role: 'user', content: userMessage });
+
+  // ✅ 1. ОТПРАВЛЯЕМ ЗАГЛУШКУ (анимация)
+  const loadingMsg = await ctx.reply('⏳ Братан, думаю над ответом...');
   
+  // ✅ 2. Добавляем в контекст
+  ctx.session.messages.push({ role: 'user', content: userMessage });
   if (ctx.session.messages.length > 20) {
     ctx.session.messages = ctx.session.messages.slice(-20);
   }
@@ -154,15 +157,39 @@ bot.on('text', async (ctx: any) => {
       model: 'sonar-pro',
       messages: ctx.session.messages,
       stream: false,
-      temperature: 0.7
+      temperature: 0.7,
     });
 
-    const reply = completion.choices[0]?.message?.content || 'Извини, братан, не понял.';
+    let reply = completion.choices[0]?.message?.content || 'Извини, не понял.';
+
+    // ✅ 3. ОЧИСТКА Markdown
+    reply = reply
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/_(.*?)_/g, '$1')
+      .replace(/\[\w+:\d+\]/g, '')
+      .replace(/`(.*?)`/g, '$1')
+      .replace(/\\[(.*?)\\]/g, '$1')
+      .replace(/\\\((.*?)\\\)/g, '$1')
+      .trim();
+
     ctx.session.messages.push({ role: 'assistant', content: reply });
-    await ctx.reply(reply);
+
+    // ✅ 4. РЕДАКТИРУЕМ заглушку на финальный ответ
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      loadingMsg.message_id,
+      undefined,
+      reply
+    );
   } catch (error) {
     console.error(error);
-    await ctx.reply('Ошибка API. Попробуй позже.');
+    // Редактируем ошибку вместо заглушки
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      loadingMsg.message_id,
+      undefined,
+      '❌ Ошибка API. Попробуй позже.'
+    );
   }
 });
 
