@@ -166,7 +166,7 @@ bot.on('text', async (ctx: any) => {
 
   try {
     const completion = await openai.chat.completions.create({
-      model: 'sonar-pro',
+      model: 'sonar',
       messages: ctx.session.messages,
       stream: false,
       temperature: 0.7,
