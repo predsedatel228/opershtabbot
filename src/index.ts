@@ -116,29 +116,34 @@ bot.command('start', async (ctx: any) => {
   }
 });
 
-// ✅ ИСПРАВЛЕНИЕ: отдельные обработчики вместо ['text', 'text_mention']
 bot.on('text', async (ctx: any) => {
   if (!ctx.session.authorized) return;
 
-  let userMessage: string = '';
+  // ✅ УМНАЯ ЛОГИКА ОПРЕДЕЛЕНИЯ СООБЩЕНИЯ
+  const botUsername = bot.botInfo?.username || '';
+  let userMessage = '';
 
-  // 1. Прямое упоминание @botname
-  const botUsername = bot.botInfo?.username;
+  // 1️⃣ ПРЯМОЕ УПОМИНАНИЕ @botname (группа/чат)
   if (ctx.message?.text?.includes(`@${botUsername}`)) {
     userMessage = ctx.message.text.replace(/@[a-zA-Z0-9_]+/g, '').trim();
-  } 
-  // 2. Reply к боту
+  }
+  // 2️⃣ Reply К ДРУГИМ БОТАМ (комментарий под @chatgpt)
   else if (ctx.message?.reply_to_message?.from?.is_bot) {
     userMessage = ctx.message.text || '';
   }
-  // 3. В личке - любой текст
+  // 3️⃣ Reply к сообщению ГДЕ ВАС ТЕГАЛИ (@другой_бот → reply @вашбот)
+  else if (ctx.message?.reply_to_message?.text?.includes(`@${botUsername}`)) {
+    userMessage = ctx.message.text || '';
+  }
+  // 4️⃣ ЛИЧКА — любой текст
   else if (ctx.chat?.type === 'private') {
     userMessage = ctx.message.text || '';
   }
-  // 4. Иначе игнорируем
+  // 5️⃣ Иначе игнорируем
   else {
     return;
   }
+
 
   if (!userMessage?.trim()) return;
 
