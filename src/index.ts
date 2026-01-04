@@ -119,27 +119,31 @@ bot.command('start', async (ctx: any) => {
 bot.on('text', async (ctx: any) => {
   if (!ctx.session.authorized) return;
 
-  // ✅ УМНАЯ ЛОГИКА ОПРЕДЕЛЕНИЯ СООБЩЕНИЯ
+  // ✅ УЛУЧШЕННАЯ ЛОГИКА
   const botUsername = bot.botInfo?.username || '';
   let userMessage = '';
 
-  // 1️⃣ ПРЯМОЕ УПОМИНАНИЕ @botname (группа/чат)
+  // 1️⃣ ПРЯМОЕ УПОМИНАНИЕ @botname в тексте
   if (ctx.message?.text?.includes(`@${botUsername}`)) {
     userMessage = ctx.message.text.replace(/@[a-zA-Z0-9_]+/g, '').trim();
   }
-  // 2️⃣ Reply К ДРУГИМ БОТАМ (комментарий под @chatgpt)
+  // 2️⃣ Reply к любому боту
   else if (ctx.message?.reply_to_message?.from?.is_bot) {
     userMessage = ctx.message.text || '';
   }
-  // 3️⃣ Reply к сообщению ГДЕ ВАС ТЕГАЛИ (@другой_бот → reply @вашбот)
+  // 3️⃣ Reply к сообщению где упоминали бота
   else if (ctx.message?.reply_to_message?.text?.includes(`@${botUsername}`)) {
     userMessage = ctx.message.text || '';
   }
-  // 4️⃣ ЛИЧКА — любой текст
+  // 4️⃣ ПЕРЕСЛАННЫЕ СООБЩЕНИЯ с @botname ← НОВОЕ!
+  else if (ctx.message?.forwardFrom && ctx.message?.text?.includes(`@${botUsername}`)) {
+    userMessage = ctx.message.text.replace(/@[a-zA-Z0-9_]+/g, '').trim();
+  }
+  // 5️⃣ ЛИЧКА — любой текст
   else if (ctx.chat?.type === 'private') {
     userMessage = ctx.message.text || '';
   }
-  // 5️⃣ Иначе игнорируем
+  // 6️⃣ Иначе игнорируем
   else {
     return;
   }
