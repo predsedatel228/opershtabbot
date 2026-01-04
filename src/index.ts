@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import express from 'express';
 dotenv.config();
+let botUsername = '';
 
 if (!process.env.BOT_TOKEN || !process.env.PERPLEXITY_API_KEY) {
   throw new Error('Missing BOT_TOKEN or PERPLEXITY_API_KEY in .env');
@@ -38,15 +39,18 @@ bot.use(session({
 // ✅ Middleware проверки доступа
 bot.use(async (ctx: any, next) => {
   const userId = ctx.from?.id;
+  const text = ctx.message?.text || '';
   
-  // Проверяем, авторизован ли пользователь
+  // ✅ Пропускаем упоминания @botname для всех
+  const hasMention = text.includes(`@${botUsername}`);
+  
   if (userId && ALLOWED_USERS.has(userId)) {
     ctx.session.authorized = true;
   }
   
-  // Блокируй ИИ-функции для неавторизованных
-  if (ctx.session.authorized !== true && !ctx.message?.text?.startsWith('/')) {
-    return ctx.reply('❌ Доступ запрещен. Используйте /start или обратитесь к администратору.');
+  // ✅ Блокируем ТОЛЬКО обычный текст без упоминания
+  if (!ctx.session.authorized && !text.startsWith('/') && !hasMention) {
+    return ctx.reply('❌ Доступ запрещен');
   }
   
   await next();
@@ -120,7 +124,6 @@ bot.on('text', async (ctx: any) => {
   if (!ctx.session.authorized) return;
 
   // ✅ УЛУЧШЕННАЯ ЛОГИКА
-  const botUsername = (await ctx.telegram.getMe()).username;
   let userMessage = '';
 
   // 1️⃣ ПРЯМОЕ УПОМИНАНИЕ @botname в тексте
@@ -207,7 +210,12 @@ process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 console.log('🚀 Opershtab Goida Bot запускается...');
-bot.launch();
+
+bot.launch().then(async () => {
+  const me = await bot.telegram.getMe();
+  botUsername = me.username;
+  console.log(`✅ Бот: @${botUsername}`);
+});;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
