@@ -120,7 +120,7 @@ bot.on('text', async (ctx: any) => {
   if (!ctx.session.authorized) return;
 
   // ✅ УЛУЧШЕННАЯ ЛОГИКА
-  const botUsername = bot.botInfo?.username || '';
+  const botUsername = (await ctx.telegram.getMe()).username;
   let userMessage = '';
 
   // 1️⃣ ПРЯМОЕ УПОМИНАНИЕ @botname в тексте
