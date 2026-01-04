@@ -1,7 +1,7 @@
 import { Telegraf, session } from 'telegraf';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
-
+import express from 'express';
 dotenv.config();
 
 if (!process.env.BOT_TOKEN || !process.env.PERPLEXITY_API_KEY) {
@@ -200,3 +200,19 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 console.log('🚀 Opershtab Goida Bot запускается...');
 bot.launch();
 
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Health check endpoint
+app.get('/', (_: any, res: { json: (arg0: { status: string; timestamp: string; }) => void; }) => {
+  res.json({ status: 'Telegram bot running', timestamp: new Date().toISOString() });
+});
+
+app.get('/health', (_: any, res: { json: (arg0: { status: string; bot: string; }) => void; }) => {
+  res.json({ status: 'OK', bot: 'active' });
+});
+
+// Запуск сервера ПОСЛЕ бота
+app.listen(PORT, () => {
+  console.log(`🚀 Health server on port ${PORT}`);
+});
