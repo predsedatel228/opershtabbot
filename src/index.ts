@@ -14,6 +14,37 @@ const ALLOWED_USERS = new Set<number>([
   admin, 177154883, 458765057, 420182056
 ]);
 
+const app = express();
+const PORT = parseInt(process.env.PORT || '10000') as number;// Render default: 10000!
+
+app.use(express.json());
+
+// ✅ Health checks - Render ОБЯЗАТЕЛЬНО ищет эти endpoints
+app.get('/', (_req, res) => {
+  res.json({ 
+    status: 'OK', 
+    service: 'opershtabbot',
+    timestamp: new Date().toISOString(),
+    port: PORT 
+  });
+});
+
+app.get('/health', (_req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    bot: 'starting',
+    uptime: process.uptime(),
+    port: PORT 
+  });
+});
+
+// ✅ Запуск сервера СРАЗУ на 0.0.0.0:PORT
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ ✅ Server listening on 0.0.0.0:${PORT}`);
+});
+
+console.log(`🚀 Server started on port ${PORT}`);
+
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const openai = new OpenAI({
   apiKey: process.env.PERPLEXITY_API_KEY,
@@ -207,55 +238,29 @@ bot.on(message('text'), async (ctx: any) => {
 });
 
 
-console.log('🚀 Opershtab Goida Bot запускается...');
-
-// Graceful shutdown
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
-
-console.log('🚀 Opershtab Goida Bot запускается...');
-
-// ✅ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ БОТА
 async function initializeBot() {
   try {
-    // Получаем информацию о боте перед запуском
     const me = await bot.telegram.getMe();
     botUsername = me.username;
     console.log(`✅ Бот: @${botUsername}`);
     
-    // Запускаем бота
     await bot.launch();
     console.log('🚀 Opershtab Goida Bot запущен!');
-    
-    // Запуск Express сервера для health checks
-    const app = express();
-    const PORT = process.env.PORT || 3000;
-
-    // Health check endpoint
-    app.get('/', (_: any, res: { json: (arg0: { status: string; timestamp: string; }) => void; }) => {
-      res.json({ status: 'Telegram bot running', timestamp: new Date().toISOString() });
-    });
-
-    app.get('/health', (_: any, res: { json: (arg0: { status: string; bot: string; username: string; }) => void; }) => {
-      res.json({ 
-        status: 'OK', 
-        bot: 'active',
-        username: botUsername 
-      });
-    });
-
-    // Запуск сервера ПОСЛЕ бота
-    app.listen(PORT, () => {
-      console.log(`🚀 Health server on port ${PORT}`);
-    });
-    
   } catch (error) {
-    console.error('❌ Ошибка при запуске бота:', error);
+    console.error('❌ Ошибка запуска бота:', error);
     process.exit(1);
   }
 }
 
+console.log('🚀 Opershtab Goida Bot запускается...');
+setTimeout(initializeBot, 2000); // Даем серверу 2 сек на запуск
 
-
-// ✅ ЗАПУСКАЕМ ИНИЦИАЛИЗАЦИЮ
-initializeBot();
+// Graceful shutdown
+process.once('SIGINT', () => {
+  console.log('SIGINT received, stopping bot...');
+  bot.stop('SIGINT');
+});
+process.once('SIGTERM', () => {
+  console.log('SIGTERM received, stopping bot...');
+  bot.stop('SIGTERM');
+});
