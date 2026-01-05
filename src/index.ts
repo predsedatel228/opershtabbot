@@ -209,68 +209,51 @@ bot.on(message('text'), async (ctx: any) => {
 
 console.log('🚀 Opershtab Goida Bot запускается...');
 
+// Graceful shutdown
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+console.log('🚀 Opershtab Goida Bot запускается...');
+
 // ✅ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ БОТА
 async function initializeBot() {
   try {
+    // Получаем информацию о боте перед запуском
     const me = await bot.telegram.getMe();
     botUsername = me.username;
     console.log(`✅ Бот: @${botUsername}`);
-
+    
+    // Запускаем бота
     await bot.launch();
     console.log('🚀 Opershtab Goida Bot запущен!');
-
-    const app = express();
     
-    // ✅ TypeScript-safe порт
-    const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+    // Запуск Express сервера для health checks
+    const app = express();
+    const PORT = process.env.PORT || 3000;
 
-    app.get('/', (_, res) => {
+    // Health check endpoint
+    app.get('/', (_: any, res: { json: (arg0: { status: string; timestamp: string; }) => void; }) => {
+      res.json({ status: 'Telegram bot running', timestamp: new Date().toISOString() });
+    });
+
+    app.get('/health', (_: any, res: { json: (arg0: { status: string; bot: string; username: string; }) => void; }) => {
       res.json({ 
-        status: 'Telegram bot running', 
-        timestamp: new Date().toISOString(),
-        bot: `@${botUsername}`
-      });
-    });
-
-    app.get('/health', (_, res) => {
-      res.json({
-        status: 'OK',
+        status: 'OK', 
         bot: 'active',
-        username: botUsername,
-        port: PORT
+        username: botUsername 
       });
     });
 
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Health server listening on 0.0.0.0:${PORT}`);
+    // Запуск сервера ПОСЛЕ бота
+    app.listen(PORT, () => {
+      console.log(`🚀 Health server on port ${PORT}`);
     });
-
+    
   } catch (error) {
     console.error('❌ Ошибка при запуске бота:', error);
     process.exit(1);
   }
 }
-
-// 🛡️ Graceful shutdown - останавливает конфликты 409
-process.once('SIGINT', async () => {
-  console.log('🛑 SIGINT: Graceful shutdown...');
-  try {
-    await bot.stop('SIGINT');
-  } catch(e) {
-    console.log('Stop error:', e);
-  }
-  process.exit(0);
-});
-
-process.once('SIGTERM', async () => {
-  console.log('🛑 SIGTERM: Graceful shutdown...');
-  try {
-    await bot.stop('SIGTERM');
-  } catch(e) {
-    console.log('Stop error:', e);
-  }
-  process.exit(0);
-});
 
 
 
