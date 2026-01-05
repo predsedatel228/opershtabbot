@@ -227,7 +227,7 @@ async function initializeBot() {
     // ✅ TypeScript-safe порт
     const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-    app.get('/', (req, res) => {
+    app.get('/', (_, res) => {
       res.json({ 
         status: 'Telegram bot running', 
         timestamp: new Date().toISOString(),
@@ -235,7 +235,7 @@ async function initializeBot() {
       });
     });
 
-    app.get('/health', (req, res) => {
+    app.get('/health', (_, res) => {
       res.json({
         status: 'OK',
         bot: 'active',
