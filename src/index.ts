@@ -124,19 +124,15 @@ bot.on(message('text'), async (ctx: any) => {
   // 1️⃣ ПРЯМОЕ УПОМИНАНИЕ @botname в тексте
   if (botUsername && ctx.message?.text?.includes(`@${botUsername}`)) {
     userMessage = ctx.message.text.replace(/@[a-zA-Z0-9_]+/g, '').trim();
-    console.log('3')
     console.log(ctx.message)
     if (ctx.message?.reply_to_message) {
-    // Берем текст reply + текст оригинального сообщения
-    // const replyText = ctx.message.text || '';
-    const originalText = ctx.message.reply_to_message.caption || '';
-    userMessage = `${userMessage}\n\n[Прокомментируй сообщение развернуто в соответствии с комментарием перед этим предложением: "${originalText}"]`;
-  }
+      const originalText = ctx.message.reply_to_message.caption || '';
+      userMessage = `${userMessage}\n\n[Прокомментируй сообщение развернуто в соответствии с комментарием перед этим предложением: "${originalText}"]`;
+    }
   }
   // 2️⃣ Reply к любому боту
   else if (ctx.message?.reply_to_message?.from?.is_bot) {
     userMessage = ctx.message.text || '';
-    console.log('4')
   }
   // 3️⃣ Reply к сообщению где упоминали бота
   else if (botUsername && ctx.message?.reply_to_message?.text?.includes(`@${botUsername}`)) {
@@ -158,8 +154,10 @@ bot.on(message('text'), async (ctx: any) => {
   if (!userMessage?.trim()) return;
 
   // 1. ОТПРАВЛЯЕМ ЗАГЛУШКУ (анимация)
-  const loadingMsg = await ctx.reply('⏳ Братан, думаю над ответом...');
-
+  const replyToMessageId = ctx.message.message_id;
+  const loadingMsg = await ctx.reply('⏳ Братан, думаю над ответом...', {
+    reply_parameters: { message_id: replyToMessageId }
+  });
   // 2. Добавляем в контекст
   ctx.session.messages.push({ role: 'user', content: userMessage });
   if (ctx.session.messages.length > 20) {
@@ -181,6 +179,7 @@ bot.on(message('text'), async (ctx: any) => {
       .replace(/\*\*(.*?)\*\*/g, '$1')
       .replace(/_(.*?)_/g, '$1')
       .replace(/\[\w+:\d+\]/g, '')
+      .replace(/\[\d+\]/g, '')
       .replace(/`(.*?)`/g, '$1')
       .replace(/\\[(.*?)\\]/g, '$1')
       .replace(/\\\((.*?)\\\)/g, '$1')
