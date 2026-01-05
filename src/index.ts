@@ -206,9 +206,6 @@ bot.on(message('text'), async (ctx: any) => {
   }
 });
 
-// Graceful shutdown
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 console.log('🚀 Opershtab Goida Bot запускается...');
 
@@ -253,6 +250,28 @@ async function initializeBot() {
     process.exit(1);
   }
 }
+
+// 🛡️ Graceful shutdown - останавливает конфликты 409
+process.once('SIGINT', async () => {
+  console.log('🛑 SIGINT: Graceful shutdown...');
+  try {
+    await bot.stop('SIGINT');
+  } catch(e) {
+    console.log('Stop error:', e);
+  }
+  process.exit(0);
+});
+
+process.once('SIGTERM', async () => {
+  console.log('🛑 SIGTERM: Graceful shutdown...');
+  try {
+    await bot.stop('SIGTERM');
+  } catch(e) {
+    console.log('Stop error:', e);
+  }
+  process.exit(0);
+});
+
 
 
 // ✅ ЗАПУСКАЕМ ИНИЦИАЛИЗАЦИЮ
