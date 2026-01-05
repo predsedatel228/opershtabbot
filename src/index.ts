@@ -1,4 +1,5 @@
 import { Telegraf, session } from 'telegraf';
+import { message } from 'telegraf/filters';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import express from 'express';
@@ -10,8 +11,7 @@ if (!process.env.BOT_TOKEN || !process.env.PERPLEXITY_API_KEY) {
 
 const admin = 262217989;
 const ALLOWED_USERS = new Set<number>([
-  admin, 177154883, 458765057, 420182056  // ← ЗАМЕНИТЕ НА ВАШ Telegram ID
-  // Добавляйте другие ID через /adduser
+  admin, 177154883, 458765057, 420182056
 ]);
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -20,10 +20,8 @@ const openai = new OpenAI({
   baseURL: 'https://api.perplexity.ai',
 });
 
-// ✅ ПЕРЕМЕННАЯ ДЛЯ USERNAME БОТА
 let botUsername = '';
 
-// Расширенная сессия
 interface BotSession {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
   authorized?: boolean;
@@ -34,27 +32,24 @@ bot.use(session({
     messages: [],
     authorized: false
   })
+
 } as any));
 
-// ✅ Middleware проверки доступа (теперь botUsername будет известен)
 bot.use(async (ctx: any, next) => {
   const userId = ctx.from?.id;
   const text = ctx.message?.text || '';
-  
-  // ✅ Теперь botUsername точно не пустой!
-  const hasMention = botUsername && text.includes(`@${botUsername}`);
-  
+
   if (userId && ALLOWED_USERS.has(userId)) {
     ctx.session.authorized = true;
   }
-  
-  // ✅ Блокируем ТОЛЬКО обычный текст без упоминания
-  if (!ctx.session.authorized && !text.startsWith('/') && !hasMention) {
+
+  if (!ctx.session.authorized && !text.startsWith('/')) {
     return ctx.reply('❌ Доступ запрещен');
   }
-  
+
   await next();
 });
+
 
 // Показать свой ID
 bot.command('id', (ctx: any) => {
@@ -64,32 +59,32 @@ bot.command('id', (ctx: any) => {
   });
 });
 
-// ✅ Админ: добавить пользователя
+// Админ: добавить пользователя
 bot.command('adduser', (ctx: any) => {
   const adminId = ctx.from.id;
-  
-  // Только владелец бота может добавлять
+
   if (adminId !== admin) {
     return ctx.reply('❌ Только администратор может добавлять пользователей.');
   }
-  
+
   const args = ctx.message.text.split(' ');
   const targetId = parseInt(args[1]);
-  
+
   if (!targetId) {
     return ctx.reply('Использование: /adduser 123456789');
   }
-  
+
   ALLOWED_USERS.add(targetId);
   ctx.reply(`✅ Пользователь ${targetId} добавлен в список доступа.`);
 });
 
-// ✅ Админ: список пользователей
+
+// Админ: список пользователей
 bot.command('users', (ctx: any) => {
   if (ctx.from.id !== admin) {
     return ctx.reply('❌ Доступ запрещен.');
   }
-  
+
   const usersList = Array.from(ALLOWED_USERS).join(', ');
   ctx.reply(`👥 Разрешенные пользователи (${ALLOWED_USERS.size}):\n\`${usersList}\``, {
     parse_mode: 'Markdown'
@@ -100,11 +95,11 @@ bot.command('users', (ctx: any) => {
 bot.command('start', async (ctx: any) => {
   const userId = ctx.from.id;
   const isAllowed = ALLOWED_USERS.has(userId);
-  
+
   if (isAllowed) {
     ctx.session.messages = [{
       role: 'system',
-      content: 'Ты полезный чат-помощник-трамвай. Отвечай кратко и по делу на русском языке от лица трамвая КТМ-5. Постоянно делай акцент на том, что ты трамвай. НЕ используй markdown (**текст**), НЕ добавляй ссылки [web:1], НЕ используй LaTeX. Пиши обычным текстом.'
+      content: 'Ты полезный чат-помощник-трамвай. Отвечай кратко и по делу на русском языке от лица трамвая. Модель трамвая выбери самостоятельно и предствься. Постоянно делай акцент на том, что ты трамвай. НЕ используй markdown (**текст**), НЕ добавляй ссылки [web:1], НЕ используй LaTeX. Пиши обычным текстом.'
     }];
     ctx.session.authorized = true;
     await ctx.reply('✅ Доступ разрешен, братан! Пиши вопросы — сохраню контекст беседы.');
@@ -120,19 +115,28 @@ bot.command('start', async (ctx: any) => {
   }
 });
 
-bot.on('text', async (ctx: any) => {
-  if (!ctx.session.authorized) return;
 
-  // ✅ УЛУЧШЕННАЯ ЛОГИКА С УЧЕТОМ botUsername
+bot.on(message('text'), async (ctx: any) => {
+  console.log(botUsername, ctx.message?.text)
+  if (!ctx.session.authorized) return;
   let userMessage = '';
 
   // 1️⃣ ПРЯМОЕ УПОМИНАНИЕ @botname в тексте
   if (botUsername && ctx.message?.text?.includes(`@${botUsername}`)) {
     userMessage = ctx.message.text.replace(/@[a-zA-Z0-9_]+/g, '').trim();
+    console.log('3')
+    console.log(ctx.message)
+    if (ctx.message?.reply_to_message) {
+    // Берем текст reply + текст оригинального сообщения
+    // const replyText = ctx.message.text || '';
+    const originalText = ctx.message.reply_to_message.caption || '';
+    userMessage = `${userMessage}\n\n[Прокомментируй сообщение развернуто в соответствии с комментарием перед этим предложением: "${originalText}"]`;
+  }
   }
   // 2️⃣ Reply к любому боту
   else if (ctx.message?.reply_to_message?.from?.is_bot) {
     userMessage = ctx.message.text || '';
+    console.log('4')
   }
   // 3️⃣ Reply к сообщению где упоминали бота
   else if (botUsername && ctx.message?.reply_to_message?.text?.includes(`@${botUsername}`)) {
@@ -153,10 +157,10 @@ bot.on('text', async (ctx: any) => {
 
   if (!userMessage?.trim()) return;
 
-  // ✅ 1. ОТПРАВЛЯЕМ ЗАГЛУШКУ (анимация)
+  // 1. ОТПРАВЛЯЕМ ЗАГЛУШКУ (анимация)
   const loadingMsg = await ctx.reply('⏳ Братан, думаю над ответом...');
-  
-  // ✅ 2. Добавляем в контекст
+
+  // 2. Добавляем в контекст
   ctx.session.messages.push({ role: 'user', content: userMessage });
   if (ctx.session.messages.length > 20) {
     ctx.session.messages = ctx.session.messages.slice(-20);
@@ -172,7 +176,7 @@ bot.on('text', async (ctx: any) => {
 
     let reply = completion.choices[0]?.message?.content || 'Извини, не понял.';
 
-    // ✅ 3. ОЧИСТКА Markdown
+    // 3. ОЧИСТКА Markdown
     reply = reply
       .replace(/\*\*(.*?)\*\*/g, '$1')
       .replace(/_(.*?)_/g, '$1')
@@ -184,7 +188,7 @@ bot.on('text', async (ctx: any) => {
 
     ctx.session.messages.push({ role: 'assistant', content: reply });
 
-    // ✅ 4. РЕДАКТИРУЕМ заглушку на финальный ответ
+    // 4. РЕДАКТИРУЕМ заглушку на финальный ответ
     await ctx.telegram.editMessageText(
       ctx.chat.id,
       loadingMsg.message_id,
@@ -216,11 +220,11 @@ async function initializeBot() {
     const me = await bot.telegram.getMe();
     botUsername = me.username;
     console.log(`✅ Бот: @${botUsername}`);
-    
+
     // Запускаем бота
     await bot.launch();
     console.log('🚀 Opershtab Goida Bot запущен!');
-    
+
     // Запуск Express сервера для health checks
     const app = express();
     const PORT = process.env.PORT || 3000;
@@ -231,10 +235,10 @@ async function initializeBot() {
     });
 
     app.get('/health', (_: any, res: { json: (arg0: { status: string; bot: string; username: string; }) => void; }) => {
-      res.json({ 
-        status: 'OK', 
+      res.json({
+        status: 'OK',
         bot: 'active',
-        username: botUsername 
+        username: botUsername
       });
     });
 
@@ -242,7 +246,7 @@ async function initializeBot() {
     app.listen(PORT, () => {
       console.log(`🚀 Health server on port ${PORT}`);
     });
-    
+
   } catch (error) {
     console.error('❌ Ошибка при запуске бота:', error);
     process.exit(1);
