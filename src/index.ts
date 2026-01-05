@@ -215,35 +215,37 @@ console.log('🚀 Opershtab Goida Bot запускается...');
 // ✅ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ БОТА
 async function initializeBot() {
   try {
-    // Получаем информацию о боте перед запуском
     const me = await bot.telegram.getMe();
     botUsername = me.username;
     console.log(`✅ Бот: @${botUsername}`);
 
-    // Запускаем бота
     await bot.launch();
     console.log('🚀 Opershtab Goida Bot запущен!');
 
-    // Запуск Express сервера для health checks
     const app = express();
-    const PORT = process.env.PORT || 3000;
+    
+    // ✅ TypeScript-safe порт
+    const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-    // Health check endpoint
-    app.get('/', (_: any, res: { json: (arg0: { status: string; timestamp: string; }) => void; }) => {
-      res.json({ status: 'Telegram bot running', timestamp: new Date().toISOString() });
-    });
-
-    app.get('/health', (_: any, res: { json: (arg0: { status: string; bot: string; username: string; }) => void; }) => {
-      res.json({
-        status: 'OK',
-        bot: 'active',
-        username: botUsername
+    app.get('/', (req, res) => {
+      res.json({ 
+        status: 'Telegram bot running', 
+        timestamp: new Date().toISOString(),
+        bot: `@${botUsername}`
       });
     });
 
-    // Запуск сервера ПОСЛЕ бота
-    app.listen(PORT, () => {
-      console.log(`🚀 Health server on port ${PORT}`);
+    app.get('/health', (req, res) => {
+      res.json({
+        status: 'OK',
+        bot: 'active',
+        username: botUsername,
+        port: PORT
+      });
+    });
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Health server listening on 0.0.0.0:${PORT}`);
     });
 
   } catch (error) {
@@ -251,6 +253,7 @@ async function initializeBot() {
     process.exit(1);
   }
 }
+
 
 // ✅ ЗАПУСКАЕМ ИНИЦИАЛИЗАЦИЮ
 initializeBot();
