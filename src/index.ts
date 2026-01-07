@@ -157,7 +157,7 @@ bot.on(message('text'), async (ctx: any) => {
     userMessage = ctx.message.text.replace(/@[a-zA-Z0-9_]+/g, '').trim();
     console.log(ctx.message)
     if (ctx.message?.reply_to_message) {
-      const originalText = ctx.message.reply_to_message.caption || '';
+      const originalText = ctx.message.reply_to_message.caption || ctx.message.reply_to_message.text;
       userMessage = `${userMessage}\n\n[Прокомментируй сообщение развернуто в соответствии с комментарием перед этим предложением: "${originalText}"]`;
     }
   }
