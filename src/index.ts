@@ -227,7 +227,7 @@ bot.on(message('text'), async (ctx: any) => {
       ctx.chat.id,
       loadingMsg.message_id,
       undefined,
-      '❌ Ошибка API. Попробуй позже.'
+      `❌ Ошибка API. Попробуй позже. ${error}`
     );
   }
 });
