@@ -206,7 +206,7 @@ bot.on(message('text'), async (ctx: any) => {
       model: 'sonar',
       messages: session.messages,
       stream: false,
-      temperature: 0.7,
+      temperature: 1.3,
     });
 
     let reply = completion.choices[0]?.message?.content || 'Извини, не понял.';
